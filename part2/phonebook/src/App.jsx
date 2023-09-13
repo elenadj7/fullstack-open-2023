@@ -4,6 +4,7 @@ import Filter from './components/Filter'
 import Persons from './components/Persons'
 import PersonForm from './components/PersonForm'
 import personsService from './services/persons'
+import Notification from './components/Notification'
 
 const App = () => {
   const [persons, setPersons] = useState([])
@@ -11,6 +12,8 @@ const App = () => {
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [newFilter, setNewFilter] = useState('')
+  const [message, setMessage] = useState(null)
+  const [messageType, setMessageType] = useState('')
 
   useEffect(() => {
     personsService.getAll()
@@ -31,13 +34,23 @@ const App = () => {
         const updatedPerson = {id: existingPerson.id, name: existingPerson.name, number: newNumber}
         personsService
         .updatePerson(updatedPerson)
-        .catch(err => {
-          alert(`can\'t update ${updatedPerson.name}`)
+        .then(data =>{
+          const tempPersons = persons.filter(p => p.id !== updatedPerson.id)
+          tempPersons.push(updatedPerson)
+          setPersons(tempPersons);
+          setMessage(`Person ${updatedPerson.name} is updated successfully`)
+          setTimeout(() => {
+            setMessage(null)
+          }, 5000)
         })
-
-        const tempPersons = persons.filter(p => p.id !== updatedPerson.id)
-        tempPersons.push(updatedPerson)
-        setPersons(tempPersons);
+        .catch(err => {
+          setMessage(`can\'t update ${updatedPerson.name}`)
+          setMessageType('error')
+          setTimeout(() => {
+            setMessage(null)
+            setMessageType('')
+          }, 5000)
+        })
       }
       
       return;
@@ -49,22 +62,41 @@ const App = () => {
     temp.push(tempPerson)
     personsService
     .addPerson(tempPerson)
-    .catch(err => {
-      alert(`can\'t add ${tempPerson.name}`)
+    .then(data =>{
+      setPersons(temp)
+      setMessage(`Person ${tempPerson.name} is added successfully`)
+      setTimeout(() => {
+        setMessage(null)
+      }, 5000)
     })
-    setPersons(temp)
+    .catch(err => {
+      setMessage(`can\'t add ${tempPerson.name}`)
+      setMessageType('error')
+      setTimeout(() => {
+        setMessage(null)
+        setMessageType('')
+      }, 5000)
+    })
   }
 
   const deletePerson = id => {
     const personToDelete = persons.find(p => p.id === id)
 
     if (window.confirm(`Delete ${personToDelete.name}?`)) {
+      
       personsService
         .deletePerson(id)
-        .catch(err => {
-          alert(`can\'t delete ${personToDelete.name}`)
+        .then(data => {
+          setPersons(persons.filter(p => p.id !== id))
         })
-      setPersons(persons.filter(p => p.id !== id))
+        .catch(err => {
+          setMessage(`can\'t delete ${personToDelete.name}`)
+          setMessageType('error')
+          setTimeout(() => {
+            setMessage(null)
+            setMessageType('')
+          }, 5000)
+        })
     }
   }
 
@@ -92,6 +124,7 @@ const App = () => {
     <div>
       <h2> Phonebook </h2>
       <Filter filter={filter} newFilter={newFilter} handleNewFilterOnChange={handleNewFilterOnChange} persons={filteredPersons}/>
+      <Notification message={message} type={messageType}/>
       <Header header="Add a new" />
       <PersonForm addPerson={addPerson} newName={newName} handleNewNameOnChange={handleNewNameOnChange} newNumber={newNumber} handleNewNumberOnChange={handleNewNumberOnChange} />
       <Header header="Numbers" />

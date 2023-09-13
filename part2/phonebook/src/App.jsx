@@ -3,7 +3,7 @@ import Header from './components/Header'
 import Filter from './components/Filter'
 import Persons from './components/Persons'
 import PersonForm from './components/PersonForm'
-import axios from 'axios'
+import personsService from './services/persons'
 
 const App = () => {
   const [persons, setPersons] = useState([])
@@ -13,12 +13,10 @@ const App = () => {
   const [newFilter, setNewFilter] = useState('')
 
   useEffect(() => {
-    console.log('effect')
-    axios
-      .get('http://localhost:3001/persons')
-      .then(response => {
+    personsService.getAll()
+      .then(data => {
         console.log('promise fulfilled')
-        setPersons(response.data)
+        setPersons(data)
       })
   }, [])
 
@@ -26,10 +24,22 @@ const App = () => {
     event.preventDefault()
     //console.log('button clicked', event.target.value)
     
-    const ifPersonExists = persons.some(p => p.name === newName && p.number === newNumber)
+    const existingPerson = persons.find(p => p.name === newName)
 
-    if(ifPersonExists){
-      alert(`${newName} ${newNumber} is already added to phonebook`)
+    if(existingPerson){
+      if(window.confirm(`${newName} ${newNumber} is already added to phonebook, replace the old number with a new one?`)){
+        const updatedPerson = {id: existingPerson.id, name: existingPerson.name, number: newNumber}
+        personsService
+        .updatePerson(updatedPerson)
+        .catch(err => {
+          alert(`can\'t update ${updatedPerson.name}`)
+        })
+
+        const tempPersons = persons.filter(p => p.id !== updatedPerson.id)
+        tempPersons.push(updatedPerson)
+        setPersons(tempPersons);
+      }
+      
       return;
     }
 
@@ -37,7 +47,25 @@ const App = () => {
     const tempPerson = { id: newId, name: newName, number: newNumber} 
     const temp = [...persons]
     temp.push(tempPerson)
+    personsService
+    .addPerson(tempPerson)
+    .catch(err => {
+      alert(`can\'t add ${tempPerson.name}`)
+    })
     setPersons(temp)
+  }
+
+  const deletePerson = id => {
+    const personToDelete = persons.find(p => p.id === id)
+
+    if (window.confirm(`Delete ${personToDelete.name}?`)) {
+      personsService
+        .deletePerson(id)
+        .catch(err => {
+          alert(`can\'t delete ${personToDelete.name}`)
+        })
+      setPersons(persons.filter(p => p.id !== id))
+    }
   }
 
   const handleNewNameOnChange = (event) => {
@@ -63,12 +91,11 @@ const App = () => {
   return (
     <div>
       <h2> Phonebook </h2>
-      <Filter filter={filter} newFilter={newFilter} handleNewFilterOnChange={handleNewFilterOnChange} />
-      <Persons persons={filteredPersons} />
+      <Filter filter={filter} newFilter={newFilter} handleNewFilterOnChange={handleNewFilterOnChange} persons={filteredPersons}/>
       <Header header="Add a new" />
       <PersonForm addPerson={addPerson} newName={newName} handleNewNameOnChange={handleNewNameOnChange} newNumber={newNumber} handleNewNumberOnChange={handleNewNumberOnChange} />
       <Header header="Numbers" />
-      <Persons persons={persons} />
+      <Persons persons={persons} onDelete={deletePerson}/>
     </div>
   )
 }

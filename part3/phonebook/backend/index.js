@@ -3,6 +3,7 @@ const { request } = require('http')
 const app = express()
 const morgan = require('morgan')
 const cors = require('cors')
+const Person = require('./models/person')
 
 app.use(cors())
 
@@ -21,87 +22,99 @@ app.use(
   
 app.use(express.json())
 
-let persons = [
-    { 
-      "id": 1,
-      "name": "Arto Hellas", 
-      "number": "040-123456"
-    },
-    { 
-      "id": 2,
-      "name": "Ada Lovelace", 
-      "number": "39-44-5323523"
-    },
-    { 
-      "id": 3,
-      "name": "Dan Abramov", 
-      "number": "12-43-234345"
-    },
-    { 
-      "id": 4,
-      "name": "Mary Poppendieck", 
-      "number": "39-23-6423122"
-    }
-]
+app.use((err, req, res, next) => {
+    console.error(err); 
+  
+    res.status(500).json({ error: 'Internal Server Error' });
+  });
+  
 
 app.get('/', (request, response) => {
   response.send('<h1>Hello World!</h1>')
 })
 
-app.get('/info', (request, response) => {
+app.get('/info', (request, response, next) => {
     const currentTime = new Date().toLocaleString()
-    const personsCount = persons.length
+    Person.find({})
+    .then(ps => {
+      const personsCount = ps.length
 
-    const res = `Phonebook has info for ${personsCount} people<br />${currentTime}`
-    response.send(res)
+      const res = `Phonebook has info for ${personsCount} people<br />${currentTime}`
+      response.send(res)
+    })
+    .catch(error => {
+        next(error)
+    });
 })
 
-app.get('/api/persons', (request, response) => {
-    response.json(persons)
+app.get('/api/persons', (request, response, next) => {
+    Person.find({})
+    .then(ps => {
+        response.json(ps)
+    })
+    .catch(error => {
+        next(error)
+    })
 })
 
-app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const person = persons.find(p => p.id === id)
-    if(person){
+app.get('/api/persons/:id', (request, response, next) => {
+    Person.findById(request.params.id)
+    .then(person => {
         response.json(person)
-    }
-    else{
-        response.status(404).json({ error: 'there is no person with this id' })
-    }
+    })
+    .catch(error => {
+        next(error)
+    });
 })
 
-app.delete('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    persons = persons.filter( p => p.id !== id)
-  
-    response.status(204).end()
+app.delete('/api/persons/:id', (request, response, next) => {
+    Person.findOneAndDelete({ _id: request.params.id})
+    .then(person => {
+        response.status(204).end()
+    })
+    .catch(error => {
+        next(error)
+    })
 })
 
-app.post('/api/persons', (request, response) => {
-    const body = request.body;
+app.post('/api/persons', (request, response, next) => {
+    const body = request.body
 
     if(!body.name || !body.number){
         response.status(400).json({ error: 'missing name or number' })
     }
 
-    const isDuplicate = persons.some(p => p.name === body.name)
-    if(isDuplicate){
-        response.status(400).json({ error: 'name must be unique' })
+    const person = new Person({
+        name: body.name,
+        number: body.number
+    })
+
+    person.save().then(p =>{
+        response.status(204).json(p)
+    })
+    .catch(error =>{
+        next(error)
+    })
+})
+
+app.put('/api/persons/:id', (request, response, next) => {
+    const body = request.body
+
+    if(!body.number){
+        response.status(400).json({error: 'missing number'})
     }
 
-    const randomNum = Math.random() * 1000000000;
-    const timestamp = Date.now()
-    const uniqueID = randomNum + timestamp
-
-    const newPerson = {
-        id: uniqueID,
+    const person = {
         name: body.name,
         number: body.number
     }
 
-    persons.push(newPerson)
-    response.status(201).json(newPerson)
+    Person.findByIdAndUpdate(request.params.id, person, {new: true, runValidators: true, context: 'query'}).then(p => {
+        response.status(200).json(person)
+    })
+    .catch(error => {
+        next(error)
+    })
 })
 
 const PORT = process.env.PORT || 3001
